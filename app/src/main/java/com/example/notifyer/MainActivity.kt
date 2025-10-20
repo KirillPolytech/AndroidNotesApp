@@ -3,7 +3,6 @@ package com.example.notifyer
 import android.app.AlertDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.widget.Button
@@ -16,7 +15,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.sql.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var noteInput: EditText
@@ -35,7 +33,7 @@ class MainActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerView)
         dbHelper = NoteDatabaseHelper(this)
         noteAdapter = NoteAdapter(mutableListOf()) { note, position ->
-            showEditDialog(note, position)
+            showEditDialog(note)
         }
 
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -67,7 +65,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showEditDialog(note: Note, position: Int) {
+    private fun showEditDialog(note: Note) {
         val editText = EditText(this).apply {
             setText(note.text)
         }
@@ -91,7 +89,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showNotification(noteText: String, title: String) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "note_channel"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
