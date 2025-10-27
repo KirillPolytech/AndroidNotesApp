@@ -4,63 +4,133 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-
-data class Note(val id: Int, val text: String)
+import android.util.Log
 
 class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
     companion object {
         private const val DATABASE_NAME = "notes.db"
-        private const val DATABASE_VERSION = 1
-        private const val TABLE_NAME = "notes"
+        private const val DATABASE_VERSION = 4 // Увеличиваем версию для пересоздания
+        private const val TABLE_NOTES = "notes"
+        private const val TABLE_CATEGORIES = "categories"
         private const val COLUMN_ID = "id"
-        private const val COLUMN_NOTE = "note"
+        private const val COLUMN_TEXT = "text"
+        private const val COLUMN_CATEGORY_ID = "category_id"
+        private const val COLUMN_CREATED_AT = "created_at"
+        private const val COLUMN_UPDATED_AT = "updated_at"
+        private const val COLUMN_NAME = "name"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        val createTable = """
-            CREATE TABLE $TABLE_NAME (
+        val createCategoriesTable = """
+            CREATE TABLE $TABLE_CATEGORIES (
                 $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                $COLUMN_NOTE TEXT
+                $COLUMN_NAME TEXT NOT NULL
             )
-        """.trimIndent()
-        db.execSQL(createTable)
+        """
+        db.execSQL(createCategoriesTable)
+
+        val createNotesTable = """
+            CREATE TABLE $TABLE_NOTES (
+                $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $COLUMN_TEXT TEXT NOT NULL,
+                $COLUMN_CATEGORY_ID INTEGER,
+                $COLUMN_CREATED_AT INTEGER NOT NULL,
+                $COLUMN_UPDATED_AT INTEGER NOT NULL,
+                FOREIGN KEY ($COLUMN_CATEGORY_ID) REFERENCES $TABLE_CATEGORIES($COLUMN_ID)
+            )
+        """
+        db.execSQL(createNotesTable)
+
+        // Начальные категории
+        Log.d("NoteDatabaseHelper", "Creating default categories")
+        db.execSQL("INSERT INTO $TABLE_CATEGORIES ($COLUMN_NAME) VALUES ('Personal')")
+        db.execSQL("INSERT INTO $TABLE_CATEGORIES ($COLUMN_NAME) VALUES ('Work')")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
+        Log.d("NoteDatabaseHelper", "Upgrading database from version $oldVersion to $newVersion")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
         onCreate(db)
     }
 
-    fun addNote(note: String) {
+    fun addCategory(name: String): Long {
         val db = writableDatabase
         val values = ContentValues().apply {
-            put(COLUMN_NOTE, note)
+            put(COLUMN_NAME, name)
         }
-        db.insert(TABLE_NAME, null, values)
+        val id = db.insert(TABLE_CATEGORIES, null, values)
+        Log.d("NoteDatabaseHelper", "Added category: $name, id: $id")
+        db.close()
+        return id
+    }
+
+    fun addNote(text: String, categoryId: Int) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_TEXT, text)
+            put(COLUMN_CATEGORY_ID, categoryId)
+            put(COLUMN_CREATED_AT, System.currentTimeMillis())
+            put(COLUMN_UPDATED_AT, System.currentTimeMillis())
+        }
+        val id = db.insert(TABLE_NOTES, null, values)
+        Log.d("NoteDatabaseHelper", "Added note: $text, categoryId: $categoryId, id: $id")
         db.close()
     }
 
-    fun updateNote(id: Int, newText: String) {
+    fun updateNote(id: Int, text: String, categoryId: Int) {
         val db = writableDatabase
         val values = ContentValues().apply {
-            put(COLUMN_NOTE, newText)
+            put(COLUMN_TEXT, text)
+            put(COLUMN_CATEGORY_ID, categoryId)
+            put(COLUMN_UPDATED_AT, System.currentTimeMillis())
         }
-        db.update(TABLE_NAME, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
+        val rows = db.update(TABLE_NOTES, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
+        Log.d("NoteDatabaseHelper", "Updated note id: $id, text: $text, categoryId: $categoryId, rows affected: $rows")
         db.close()
     }
 
-    fun getAllNotes(): List<Note> {
+    fun deleteNote(id: Int) {
+        val db = writableDatabase
+        val rows = db.delete(TABLE_NOTES, "$COLUMN_ID = ?", arrayOf(id.toString()))
+        Log.d("NoteDatabaseHelper", "Deleted note id: $id, rows affected: $rows")
+        db.close()
+    }
+
+    fun getAllNotes(categoryId: Int? = null): List<Note> {
         val notes = mutableListOf<Note>()
         val db = readableDatabase
-        val cursor = db.query(TABLE_NAME, arrayOf(COLUMN_ID, COLUMN_NOTE), null, null, null, null, null)
-
+        val selection = categoryId?.let { "$COLUMN_CATEGORY_ID = ?" }
+        val selectionArgs = categoryId?.let { arrayOf(it.toString()) }
+        val cursor = db.query(TABLE_NOTES, arrayOf(COLUMN_ID, COLUMN_TEXT, COLUMN_CATEGORY_ID, COLUMN_CREATED_AT, COLUMN_UPDATED_AT),
+            selection, selectionArgs, null, null, null)
+        Log.d("NoteDatabaseHelper", "Fetched ${cursor.count} notes")
         while (cursor.moveToNext()) {
             val id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID))
-            val text = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NOTE))
-            notes.add(Note(id, text))
+            val text = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TEXT))
+            val catId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_ID))
+            val createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT))
+            val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT))
+            notes.add(Note(id, text, catId, createdAt, updatedAt))
         }
         cursor.close()
         db.close()
         return notes
+    }
+
+    fun getAllCategories(): List<Category> {
+        val categories = mutableListOf<Category>()
+        val db = readableDatabase
+        val cursor = db.query(TABLE_CATEGORIES, arrayOf(COLUMN_ID, COLUMN_NAME), null, null, null, null, null)
+        Log.d("NoteDatabaseHelper", "Fetched ${cursor.count} categories")
+        while (cursor.moveToNext()) {
+            val id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID))
+            val name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME))
+            categories.add(Category(id, name))
+        }
+        cursor.close()
+        db.close()
+        return categories
     }
 }
