@@ -15,5 +15,6 @@
     <string name="notification_channel_name">Уведомления о заметках</string>
     <string name="created_at_label">Создано: %1$s</string>
     <string name="updated_at_label">Обновлено: %1$s</string>
+    <string name="reminder_time_label">Напоминание: %1$s</string> <!-- Новое -->
     <string name="category_none">Без категории</string>
 </resources>

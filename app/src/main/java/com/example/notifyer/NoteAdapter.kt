@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class NoteAdapter(
     private val notes: MutableList<Note>,
-    private var categories: List<Category>, // Изменено на var для обновления
+    private var categories: List<Category>,
     private val onEditClick: (Note) -> Unit,
     private val onDeleteClick: (Note) -> Unit
 ) : RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
@@ -20,6 +20,7 @@ class NoteAdapter(
         val categoryText: TextView = itemView.findViewById(R.id.categoryText)
         val createdAtText: TextView = itemView.findViewById(R.id.createdAtText)
         val updatedAtText: TextView = itemView.findViewById(R.id.updatedAtText)
+        val reminderTimeText: TextView = itemView.findViewById(R.id.reminderTimeText) // Новое поле
         val deleteButton: Button = itemView.findViewById(R.id.deleteButton)
     }
 
@@ -35,9 +36,12 @@ class NoteAdapter(
         val category = categories.find { it.id == note.categoryId }
         holder.categoryText.text = category?.name
             ?: holder.itemView.context.getString(R.string.category_none)
-        Log.d("NoteAdapter", "Note id: ${note.id}, categoryId: ${note.categoryId}, category: ${category?.name ?: "None"}")
         holder.createdAtText.text = holder.itemView.context.getString(R.string.created_at_label, note.getFormattedCreatedAt())
         holder.updatedAtText.text = holder.itemView.context.getString(R.string.updated_at_label, note.getFormattedUpdatedAt())
+        holder.reminderTimeText.text = note.getFormattedReminderTime()?.let {
+            holder.itemView.context.getString(R.string.reminder_time_label, it)
+        } ?: "No reminder"
+        Log.d("NoteAdapter", "Note id: ${note.id}, categoryId: ${note.categoryId}, category: ${category?.name ?: "None"}, reminder: ${note.getFormattedReminderTime() ?: "None"}")
         holder.itemView.setOnClickListener {
             onEditClick(note)
         }
