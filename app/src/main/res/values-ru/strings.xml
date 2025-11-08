@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Notifyer</string>
+    <string name="note_input_hint">Введите заметку…</string>
+    <string name="add_button">Добавить</string>
+    <string name="add_folder">Добавить папку</string>
+    <string name="edit_note_title">Редактировать заметку</string>
+    <string name="save_button">Сохранить</string>
+    <string name="cancel_button">Отмена</string>
+    <string name="delete_button">Удалить</string>
+    <string name="delete_note_title">Удалить заметку</string>
+    <string name="delete_note_message">Вы уверены, что хотите удалить эту заметку?</string>
+    <string name="note_added_notification">Заметка добавлена!</string>
+    <string name="menu">Меню</string>
+    <string name="folders">Папки</string>
+    <string name="all_notes">Все заметки</string>
+    <string name="personal">Личное</string>
+    <string name="work">Работа</string>
+    <string name="reminder_time_label">Напоминание: %1$s</string>
+    <string name="no_reminder">Нет напоминания</string>
+</resources>

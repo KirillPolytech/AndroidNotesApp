@@ -1,5 +1,6 @@
 package com.example.notifyer
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,7 +17,6 @@ class NoteAdapter(
 ) : RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
 
     class NoteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val titleText: TextView = itemView.findViewById(R.id.titleText)
         val bodyText: TextView = itemView.findViewById(R.id.bodyText)
         val folderText: TextView = itemView.findViewById(R.id.folderText)
         val createdAtText: TextView = itemView.findViewById(R.id.createdAtText)
@@ -34,28 +34,26 @@ class NoteAdapter(
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
         val note = notes[position]
 
-        // Исправление: Показываем title, если он есть, иначе — первые слова из body
-        val title = if (!note.title.isNullOrBlank()) {
-            note.title
-        } else if (!note.body.isBlank()) {
-            // Берём первую строку из body
-            note.body.split("\n").first().take(50)
-        } else {
-            "Untitled"
-        }
-
-        holder.titleText.text = title
-        holder.bodyText.text = note.body
+        holder.bodyText.text = note.body.ifBlank { "Empty note" }
 
         val folder = folders.find { it.id == note.folderId }
         holder.folderText.text = folder?.name ?: "No folder"
         holder.createdAtText.text = note.getFormattedCreatedAt()
-        holder.reminderTimeText.text = note.getFormattedReminderTime() ?: "No reminder"
 
-        // Пин-кнопка
+        // Локализованное отображение напоминания
+        val reminderText = note.getFormattedReminderTime()
+        holder.reminderTimeText.text = if (reminderText != null) {
+            holder.itemView.context.getString(R.string.reminder_time_label, reminderText)
+        } else {
+            holder.itemView.context.getString(R.string.no_reminder)
+        }
+
+        // Кнопка Pin
         holder.pinButton.text = if (note.isPinned) "Unpin" else "Pin"
         holder.pinButton.setOnClickListener {
-            onPinToggle(note, !note.isPinned)
+            val newPinned = !note.isPinned
+            onPinToggle(note, newPinned)
+            holder.pinButton.text = if (newPinned) "Unpin" else "Pin"
         }
 
         holder.itemView.setOnClickListener { onEditClick(note) }
@@ -75,11 +73,13 @@ class NoteAdapter(
         notifyDataSetChanged()
     }
 
+    // ВЫЗЫВАЕТСЯ ИЗ MainActivity
     fun togglePin(noteId: Int, newPinned: Boolean) {
         val idx = notes.indexOfFirst { it.id == noteId }
         if (idx != -1) {
             notes[idx] = notes[idx].copy(isPinned = newPinned)
-            notifyItemChanged(idx)
+            // Перерисовываем весь список — чтобы закреплённые поднялись
+            notifyDataSetChanged()
         }
     }
 }

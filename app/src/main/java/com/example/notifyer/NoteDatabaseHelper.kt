@@ -78,7 +78,7 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         return id
     }
 
-    fun addNote(title: String, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false): Long {
+    fun addNote(title: String?, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false): Long {
         val db = writableDatabase
         val values = ContentValues().apply {
             put(COLUMN_TITLE, title)
@@ -86,25 +86,39 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             put(COLUMN_FOLDER_ID, folderId)
             put(COLUMN_CREATED_AT, System.currentTimeMillis())
             put(COLUMN_UPDATED_AT, System.currentTimeMillis())
-            reminderTime?.let { put(COLUMN_REMINDER_TIME, it) }
+            if (reminderTime != null) {
+                put(COLUMN_REMINDER_TIME, reminderTime)
+                Log.d("NoteDatabaseHelper", "Added reminderTime: $reminderTime for note")
+            } else {
+                putNull(COLUMN_REMINDER_TIME)
+                Log.d("NoteDatabaseHelper", "No reminderTime set for note")
+            }
             put(COLUMN_IS_PINNED, if (isPinned) 1 else 0)
         }
         val id = db.insert(TABLE_NOTES, null, values)
+        Log.d("NoteDatabaseHelper", "Added note id: $id, title: $title, body: $body, folderId: $folderId")
         db.close()
         return id
     }
 
-    fun updateNote(id: Int, title: String, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false) {
+    fun updateNote(id: Int, title: String?, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false) {
         val db = writableDatabase
         val values = ContentValues().apply {
             put(COLUMN_TITLE, title)
             put(COLUMN_BODY, body)
             put(COLUMN_FOLDER_ID, folderId)
             put(COLUMN_UPDATED_AT, System.currentTimeMillis())
-            reminderTime?.let { put(COLUMN_REMINDER_TIME, it) } ?: putNull(COLUMN_REMINDER_TIME)
+            if (reminderTime != null) {
+                put(COLUMN_REMINDER_TIME, reminderTime)
+                Log.d("NoteDatabaseHelper", "Updated reminderTime: $reminderTime for note $id")
+            } else {
+                putNull(COLUMN_REMINDER_TIME)
+                Log.d("NoteDatabaseHelper", "Removed reminderTime for note $id")
+            }
             put(COLUMN_IS_PINNED, if (isPinned) 1 else 0)
         }
-        db.update(TABLE_NOTES, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
+        val rows = db.update(TABLE_NOTES, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
+        Log.d("NoteDatabaseHelper", "Updated note id: $id, rows: $rows")
         db.close()
     }
 
@@ -115,11 +129,18 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
     }
 
     fun getAllNotes(folderId: Int? = null): List<Note> {
+
         val notes = mutableListOf<Note>()
         val db = readableDatabase
         val selection = folderId?.let { "$COLUMN_FOLDER_ID = ?" }
         val selectionArgs = folderId?.let { arrayOf(it.toString()) }
-        val cursor = db.query(TABLE_NOTES, null, selection, selectionArgs, null, null, "$COLUMN_IS_PINNED DESC, $COLUMN_CREATED_AT DESC")
+
+        // ВАЖНО: СОРТИРОВКА — сначала закреплённые, потом по дате
+        val cursor = db.query(
+            TABLE_NOTES, null, selection, selectionArgs, null, null,
+            "$COLUMN_IS_PINNED DESC, $COLUMN_CREATED_AT DESC"
+        )
+
         while (cursor.moveToNext()) {
             val note = Note(
                 id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID)),

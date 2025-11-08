@@ -1,15 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Notifyer</string>
-    <string name="note_input_hint">Enter note</string>
+    <string name="note_input_hint">Enter your note…</string>
     <string name="add_button">Add</string>
-    <string name="folders">Folders</string>
     <string name="add_folder">Add Folder</string>
     <string name="edit_note_title">Edit Note</string>
-    <string name="delete_note_title">Delete Note</string>
-    <string name="delete_note_message">Delete this note?</string>
     <string name="save_button">Save</string>
     <string name="cancel_button">Cancel</string>
-    <string name="note_added_notification">Note added</string>
     <string name="delete_button">Delete</string>
+    <string name="delete_note_title">Delete Note</string>
+    <string name="delete_note_message">Are you sure you want to delete this note?</string>
+    <string name="note_added_notification">Note added!</string>
     <string name="menu">Menu</string>
+    <string name="folders">Folders</string>
+    <string name="all_notes">All Notes</string>
+    <string name="personal">Personal</string>
+    <string name="work">Work</string>
+    <string name="reminder_time_label">Reminder: %1$s</string>
+    <string name="no_reminder">No reminder</string>
 </resources>

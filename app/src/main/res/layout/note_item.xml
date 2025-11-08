@@ -6,21 +6,16 @@
     android:padding="12dp"
     android:background="?android:attr/selectableItemBackground">
 
-    <TextView
-        android:id="@+id/titleText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textStyle="bold"
-        android:textSize="16sp" />
-
+    <!-- Только текст заметки -->
     <TextView
         android:id="@+id/bodyText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:textSize="16sp"
         android:maxLines="3"
         android:ellipsize="end" />
 
+    <!-- Папка, дата, напоминание -->
     <TextView
         android:id="@+id/folderText"
         android:layout_width="wrap_content"
@@ -43,6 +38,7 @@
         android:textSize="12sp"
         android:textColor="@android:color/darker_gray" />
 
+    <!-- Кнопки -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
