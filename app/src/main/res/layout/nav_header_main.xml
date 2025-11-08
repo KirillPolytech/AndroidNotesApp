@@ -3,20 +3,25 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="#6A1B9A"
+    android:gravity="center_vertical"
+    android:minHeight="?attr/actionBarSize">
 
+    <!-- Иконка вместо "Notifyer" -->
+    <ImageView
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_notifyer"
+        android:contentDescription="@string/app_name"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Папки -->
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        android:textStyle="bold"
-        android:textSize="18sp" />
-
-    <Button
-        android:id="@+id/btn_new_folder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="New Folder"
-        android:layout_marginTop="8dp" />
+        android:text="@string/folders"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
 
 </LinearLayout>

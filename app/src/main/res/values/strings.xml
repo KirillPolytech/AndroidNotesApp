@@ -18,4 +18,5 @@
     <string name="work">Work</string>
     <string name="reminder_time_label">Reminder: %1$s</string>
     <string name="no_reminder">No reminder</string>
+    <string name="search_hint">Search note…</string>
 </resources>

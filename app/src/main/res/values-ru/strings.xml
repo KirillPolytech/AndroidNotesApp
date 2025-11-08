@@ -18,4 +18,5 @@
     <string name="work">Работа</string>
     <string name="reminder_time_label">Напоминание: %1$s</string>
     <string name="no_reminder">Нет напоминания</string>
+    <string name="search_hint">Поиск заметок…</string>
 </resources>

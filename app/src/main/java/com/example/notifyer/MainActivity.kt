@@ -6,6 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
@@ -25,6 +28,7 @@ import java.util.*
 
 class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
 
+    // === VIEW ===
     private lateinit var noteInput: EditText
     private lateinit var addButton: Button
     private lateinit var recyclerView: RecyclerView
@@ -34,15 +38,35 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var navView: NavigationView
     private lateinit var menuButton: ImageButton
     private lateinit var titleTextView: TextView
+    private lateinit var searchInput: EditText
+    private lateinit var noteCountTextView: TextView
 
+    // === DATA ===
     private val scope = CoroutineScope(Dispatchers.Main)
     private var folders: List<Folder> = emptyList()
     private var currentFolderId: Int = -1
+    private var searchQuery: String = ""
 
     companion object {
         private const val REQUEST_CODE_NOTIFICATIONS = 100
         private const val FOLDER_ALL_NOTES = 1
         private const val NAV_ADD_FOLDER_ID = 999
+    }
+
+    // === ПРИНУДИТЕЛЬНЫЙ РУССКИЙ ЯЗЫК ===
+    override fun attachBaseContext(base: Context) {
+        val locale = Locale("ru")
+        Locale.setDefault(locale)
+
+        val config = base.resources.configuration
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            config.setLocale(locale)
+            super.attachBaseContext(base.createConfigurationContext(config))
+        } else {
+            config.locale = locale
+            base.resources.updateConfiguration(config, base.resources.displayMetrics)
+            super.attachBaseContext(base)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +82,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         requestPermissions()
     }
 
+    // === ИНИЦИАЛИЗАЦИЯ ВСЕХ VIEW ===
     private fun initViews() {
+        // Находим все элементы
         noteInput = findViewById(R.id.noteInput)
         addButton = findViewById(R.id.addButton)
         recyclerView = findViewById(R.id.recyclerView)
@@ -66,11 +92,18 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         navView = findViewById(R.id.nav_view)
         menuButton = findViewById(R.id.menuButton)
         titleTextView = findViewById(R.id.titleTextView)
+        searchInput = findViewById(R.id.searchInput)
+        noteCountTextView = findViewById(R.id.noteCountTextView)
         dbHelper = NoteDatabaseHelper(this)
 
+        // Открываем клавиатуру
         noteInput.requestFocus()
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.showSoftInput(noteInput, InputMethodManager.SHOW_IMPLICIT)
+
+        // Лог для проверки языка
+        Log.d("LOCALE", "Current locale: ${Locale.getDefault()}")
+        Log.d("LOCALE", "All Notes: ${getString(R.string.all_notes)}")
     }
 
     private fun setupRecyclerView() {
@@ -87,7 +120,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     private fun setupClickListeners() {
         menuButton.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
+            if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                drawerLayout.closeDrawer(GravityCompat.START)
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START)
+            }
         }
 
         addButton.setOnClickListener {
@@ -100,6 +137,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 Toast.makeText(this, "Введите текст и выберите папку", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // ПОИСК
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                searchQuery = s.toString().lowercase()
+                loadNotes()
+            }
+        })
     }
 
     private fun setupNavigation() {
@@ -159,15 +206,27 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     private fun loadNotes() {
         scope.launch {
-            val notes = withContext(Dispatchers.IO) {
+            val allNotes = withContext(Dispatchers.IO) {
                 if (currentFolderId == FOLDER_ALL_NOTES) {
                     dbHelper.getAllNotes()
                 } else {
                     dbHelper.getAllNotes(currentFolderId)
                 }
             }
-            noteAdapter.updateNotes(notes)
-            noteAdapter.updateFolders(folders)
+
+            val filteredNotes = if (searchQuery.isEmpty()) {
+                allNotes
+            } else {
+                allNotes.filter { note ->
+                    note.body.lowercase().contains(searchQuery)
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                noteAdapter.updateNotes(filteredNotes)
+                noteAdapter.updateFolders(folders)
+                updateNoteCount(filteredNotes.size)
+            }
         }
     }
 
@@ -180,6 +239,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         titleTextView.text = folderName
     }
 
+    private fun updateNoteCount(count: Int) {
+        noteCountTextView.text = count.toString()
+    }
+
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             NAV_ADD_FOLDER_ID -> {
@@ -190,6 +253,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 currentFolderId = item.itemId
                 item.isChecked = true
                 updateTitle()
+                searchInput.text.clear()
                 loadNotes()
                 drawerLayout.closeDrawer(GravityCompat.START)
                 return true
@@ -230,9 +294,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 if (reminderTime != null) {
                     setReminder(noteId, text, reminderTime)
                 }
+                withContext(Dispatchers.Main) {
+                    noteInput.text.clear()
+                    showNotification(text, getString(R.string.note_added_notification))
+                }
                 loadNotes()
-                noteInput.text.clear()
-                showNotification(text, getString(R.string.note_added_notification))
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
             }
@@ -258,9 +324,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun showEditDialog(note: Note) {
         val editText = EditText(this).apply { setText(note.body) }
         AlertDialog.Builder(this)
-            .setTitle(R.string.edit_note_title)
+            .setTitle("Редактировать заметку")
             .setView(editText)
-            .setPositiveButton(R.string.save_button) { _, _ ->
+            .setPositiveButton("Сохранить") { _, _ ->
                 val newText = editText.text.toString().trim()
                 if (newText.isNotEmpty()) {
                     scope.launch {
@@ -278,21 +344,21 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                     }
                 }
             }
-            .setNegativeButton(R.string.cancel_button, null)
+            .setNegativeButton("Отмена", null)
             .show()
     }
 
     private fun showDeleteDialog(note: Note) {
         AlertDialog.Builder(this)
-            .setTitle(R.string.delete_note_title)
-            .setMessage(R.string.delete_note_message)
-            .setPositiveButton(R.string.delete_button) { _, _ ->
+            .setTitle("Удалить заметку")
+            .setMessage("Вы уверены?")
+            .setPositiveButton("Удалить") { _, _ ->
                 scope.launch {
                     withContext(Dispatchers.IO) { dbHelper.deleteNote(note.id) }
                     loadNotes()
                 }
             }
-            .setNegativeButton(R.string.cancel_button, null)
+            .setNegativeButton("Отмена", null)
             .show()
     }
 
@@ -354,22 +420,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pending)
-    }
-
-    override fun attachBaseContext(base: Context) {
-        // УСТАНАВЛИВАЕМ РУССКИЙ ЯЗЫК ДО СОЗДАНИЯ АКТИВИТИ
-        val locale = Locale("ru")
-        Locale.setDefault(locale)
-
-        val config = base.resources.configuration
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            config.setLocale(locale)
-            super.attachBaseContext(base.createConfigurationContext(config))
-        } else {
-            config.locale = locale
-            base.resources.updateConfiguration(config, base.resources.displayMetrics)
-            super.attachBaseContext(base)
-        }
     }
 
     private fun showNotification(text: String, title: String) {
