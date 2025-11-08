@@ -10,163 +10,169 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
 
     companion object {
         private const val DATABASE_NAME = "notes.db"
-        private const val DATABASE_VERSION = 5 // Увеличиваем версию
+        private const val DATABASE_VERSION = 7
         private const val TABLE_NOTES = "notes"
-        private const val TABLE_CATEGORIES = "categories"
+        private const val TABLE_FOLDERS = "folders"
         private const val COLUMN_ID = "id"
-        private const val COLUMN_TEXT = "text"
-        private const val COLUMN_CATEGORY_ID = "category_id"
+        private const val COLUMN_TITLE = "title"
+        private const val COLUMN_BODY = "body"
+        private const val COLUMN_FOLDER_ID = "folder_id"
+        private const val COLUMN_PARENT_ID = "parent_id"
         private const val COLUMN_CREATED_AT = "created_at"
         private const val COLUMN_UPDATED_AT = "updated_at"
         private const val COLUMN_REMINDER_TIME = "reminder_time"
+        private const val COLUMN_IS_PINNED = "is_pinned"
         private const val COLUMN_NAME = "name"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        Log.d("NoteDatabaseHelper", "Creating database tables")
-        val createCategoriesTable = """
-            CREATE TABLE $TABLE_CATEGORIES (
+        Log.d("NoteDatabaseHelper", "Creating tables")
+        val createFoldersTable = """
+            CREATE TABLE $TABLE_FOLDERS (
                 $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                $COLUMN_NAME TEXT NOT NULL
+                $COLUMN_NAME TEXT NOT NULL,
+                $COLUMN_PARENT_ID INTEGER,
+                FOREIGN KEY ($COLUMN_PARENT_ID) REFERENCES $TABLE_FOLDERS($COLUMN_ID)
             )
-        """
-        db.execSQL(createCategoriesTable)
+        """.trimIndent()
+        db.execSQL(createFoldersTable)
 
         val createNotesTable = """
             CREATE TABLE $TABLE_NOTES (
                 $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                $COLUMN_TEXT TEXT NOT NULL,
-                $COLUMN_CATEGORY_ID INTEGER,
+                $COLUMN_TITLE TEXT,
+                $COLUMN_BODY TEXT NOT NULL,
+                $COLUMN_FOLDER_ID INTEGER,
                 $COLUMN_CREATED_AT INTEGER NOT NULL,
                 $COLUMN_UPDATED_AT INTEGER NOT NULL,
                 $COLUMN_REMINDER_TIME INTEGER,
-                FOREIGN KEY ($COLUMN_CATEGORY_ID) REFERENCES $TABLE_CATEGORIES($COLUMN_ID)
+                $COLUMN_IS_PINNED INTEGER DEFAULT 0,
+                FOREIGN KEY ($COLUMN_FOLDER_ID) REFERENCES $TABLE_FOLDERS($COLUMN_ID)
             )
-        """
+        """.trimIndent()
         db.execSQL(createNotesTable)
 
-        // Начальные категории
-        Log.d("NoteDatabaseHelper", "Inserting default categories")
-        db.execSQL("INSERT INTO $TABLE_CATEGORIES ($COLUMN_NAME) VALUES ('Personal')")
-        db.execSQL("INSERT INTO $TABLE_CATEGORIES ($COLUMN_NAME) VALUES ('Work')")
+        // Начальные папки
+        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('All Notes')")
+        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('Personal')")
+        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('Work')")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        Log.d("NoteDatabaseHelper", "Upgrading database from version $oldVersion to $newVersion")
-        if (oldVersion < 3) {
-            try {
-                db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $COLUMN_REMINDER_TIME INTEGER")
-            } catch (e: Exception) {
-                Log.e("NoteDatabaseHelper", "Error adding reminder_time column", e)
-            }
-        }
-        if (oldVersion < 5) {
-            // Пересоздаём таблицы для синхронизации
+        Log.d("NoteDatabaseHelper", "Upgrading from $oldVersion to $newVersion")
+        if (oldVersion < 7) {
             db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
-            db.execSQL("DROP TABLE IF EXISTS $TABLE_CATEGORIES")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_FOLDERS")
             onCreate(db)
         }
     }
 
-    fun addCategory(name: String): Long {
+    fun addFolder(name: String, parentId: Int? = null): Long {
         val db = writableDatabase
         val values = ContentValues().apply {
             put(COLUMN_NAME, name)
+            parentId?.let { put(COLUMN_PARENT_ID, it) }
         }
-        val id = db.insert(TABLE_CATEGORIES, null, values)
-        Log.d("NoteDatabaseHelper", "Added category: $name, id: $id")
+        val id = db.insert(TABLE_FOLDERS, null, values)
         db.close()
         return id
     }
 
-    fun addNote(text: String, categoryId: Int, reminderTime: Long? = null) {
+    fun addNote(title: String, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false): Long {
         val db = writableDatabase
         val values = ContentValues().apply {
-            put(COLUMN_TEXT, text)
-            put(COLUMN_CATEGORY_ID, categoryId)
+            put(COLUMN_TITLE, title)
+            put(COLUMN_BODY, body)
+            put(COLUMN_FOLDER_ID, folderId)
             put(COLUMN_CREATED_AT, System.currentTimeMillis())
             put(COLUMN_UPDATED_AT, System.currentTimeMillis())
             reminderTime?.let { put(COLUMN_REMINDER_TIME, it) }
+            put(COLUMN_IS_PINNED, if (isPinned) 1 else 0)
         }
         val id = db.insert(TABLE_NOTES, null, values)
-        Log.d("NoteDatabaseHelper", "Added note: $text, categoryId: $categoryId, id: $id, reminderTime: $reminderTime")
         db.close()
+        return id
     }
 
-    fun updateNote(id: Int, text: String, categoryId: Int, reminderTime: Long? = null) {
+    fun updateNote(id: Int, title: String, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false) {
         val db = writableDatabase
         val values = ContentValues().apply {
-            put(COLUMN_TEXT, text)
-            put(COLUMN_CATEGORY_ID, categoryId)
+            put(COLUMN_TITLE, title)
+            put(COLUMN_BODY, body)
+            put(COLUMN_FOLDER_ID, folderId)
             put(COLUMN_UPDATED_AT, System.currentTimeMillis())
-            if (reminderTime != null) {
-                put(COLUMN_REMINDER_TIME, reminderTime)
-            } else {
-                putNull(COLUMN_REMINDER_TIME)
-            }
+            reminderTime?.let { put(COLUMN_REMINDER_TIME, it) } ?: putNull(COLUMN_REMINDER_TIME)
+            put(COLUMN_IS_PINNED, if (isPinned) 1 else 0)
         }
-        val rows = db.update(TABLE_NOTES, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
-        Log.d("NoteDatabaseHelper", "Updated note id: $id, text: $text, categoryId: $categoryId, rows affected: $rows")
+        db.update(TABLE_NOTES, values, "$COLUMN_ID = ?", arrayOf(id.toString()))
         db.close()
     }
 
     fun deleteNote(id: Int) {
         val db = writableDatabase
-        val rows = db.delete(TABLE_NOTES, "$COLUMN_ID = ?", arrayOf(id.toString()))
-        Log.d("NoteDatabaseHelper", "Deleted note id: $id, rows affected: $rows")
+        db.delete(TABLE_NOTES, "$COLUMN_ID = ?", arrayOf(id.toString()))
         db.close()
     }
 
-    fun getAllNotes(categoryId: Int? = null): List<Note> {
+    fun getAllNotes(folderId: Int? = null): List<Note> {
         val notes = mutableListOf<Note>()
         val db = readableDatabase
-        val selection = categoryId?.let { "$COLUMN_CATEGORY_ID = ?" }
-        val selectionArgs = categoryId?.let { arrayOf(it.toString()) }
-        val cursor = db.query(TABLE_NOTES, arrayOf(COLUMN_ID, COLUMN_TEXT, COLUMN_CATEGORY_ID, COLUMN_CREATED_AT, COLUMN_UPDATED_AT, COLUMN_REMINDER_TIME),
-            selection, selectionArgs, null, null, null)
-        Log.d("NoteDatabaseHelper", "Fetched ${cursor.count} notes")
+        val selection = folderId?.let { "$COLUMN_FOLDER_ID = ?" }
+        val selectionArgs = folderId?.let { arrayOf(it.toString()) }
+        val cursor = db.query(TABLE_NOTES, null, selection, selectionArgs, null, null, "$COLUMN_IS_PINNED DESC, $COLUMN_CREATED_AT DESC")
         while (cursor.moveToNext()) {
-            val id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID))
-            val text = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TEXT))
-            val catId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_ID))
-            val createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT))
-            val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT))
-            val reminderTime = if (cursor.isNull(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))) null else cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))
-            notes.add(Note(id, text, catId, createdAt, updatedAt, reminderTime))
+            val note = Note(
+                id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID)),
+                title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE)) ?: "",
+                body = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_BODY)) ?: "",
+                folderId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FOLDER_ID)),
+                createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT)),
+                updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT)),
+                reminderTime = if (cursor.isNull(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))) null else cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME)),
+                isPinned = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_PINNED)) == 1
+            )
+            notes.add(note)
         }
         cursor.close()
         db.close()
         return notes
     }
 
-    fun getAllCategories(): List<Category> {
-        val categories = mutableListOf<Category>()
+    fun getAllFolders(parentId: Int? = null): List<Folder> {
+        val folders = mutableListOf<Folder>()
         val db = readableDatabase
-        val cursor = db.query(TABLE_CATEGORIES, arrayOf(COLUMN_ID, COLUMN_NAME), null, null, null, null, null)
-        Log.d("NoteDatabaseHelper", "Fetched ${cursor.count} categories")
+        val selection = parentId?.let { "$COLUMN_PARENT_ID = ?" }
+        val selectionArgs = parentId?.let { arrayOf(it.toString()) }
+        val cursor = db.query(TABLE_FOLDERS, null, selection, selectionArgs, null, null, "$COLUMN_NAME ASC")
         while (cursor.moveToNext()) {
-            val id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID))
-            val name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME))
-            categories.add(Category(id, name))
+            val folder = Folder(
+                id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID)),
+                name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME)) ?: ""
+            )
+            folders.add(folder)
         }
         cursor.close()
         db.close()
-        return categories
+        return folders
     }
 
     fun getNoteById(id: Int): Note? {
         val db = readableDatabase
-        val cursor = db.query(TABLE_NOTES, arrayOf(COLUMN_ID, COLUMN_TEXT, COLUMN_CATEGORY_ID, COLUMN_CREATED_AT, COLUMN_UPDATED_AT, COLUMN_REMINDER_TIME),
-            "$COLUMN_ID = ?", arrayOf(id.toString()), null, null, null)
+        val cursor = db.query(TABLE_NOTES, null, "$COLUMN_ID = ?", arrayOf(id.toString()), null, null, null)
         return if (cursor.moveToNext()) {
-            val text = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TEXT))
-            val catId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_ID))
-            val createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT))
-            val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT))
-            val reminderTime = if (cursor.isNull(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))) null else cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))
+            val note = Note(
+                id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID)),
+                title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE)) ?: "",
+                body = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_BODY)) ?: "",
+                folderId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_FOLDER_ID)),
+                createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT)),
+                updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_UPDATED_AT)),
+                reminderTime = if (cursor.isNull(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME))) null else cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_REMINDER_TIME)),
+                isPinned = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_IS_PINNED)) == 1
+            )
             cursor.close()
             db.close()
-            Note(id, text, catId, createdAt, updatedAt, reminderTime)
+            note
         } else {
             cursor.close()
             db.close()

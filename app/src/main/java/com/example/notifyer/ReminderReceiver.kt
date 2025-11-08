@@ -7,12 +7,10 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import android.os.Build
-import android.util.Log
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val noteId = intent.getIntExtra("noteId", -1)
-        Log.d("ReminderReceiver", "Received reminder for noteId: $noteId")
         if (noteId != -1) {
             val dbHelper = NoteDatabaseHelper(context)
             val note = dbHelper.getNoteById(noteId)
@@ -24,7 +22,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     val channel = NotificationChannel(
                         channelId,
                         "Note Reminders",
-                        NotificationManager.IMPORTANCE_DEFAULT
+                        NotificationManager.IMPORTANCE_HIGH
                     )
                     notificationManager.createNotificationChannel(channel)
                 }
@@ -32,15 +30,13 @@ class ReminderReceiver : BroadcastReceiver() {
                 val notification = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentTitle("Reminder")
-                    .setContentText(it.text)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentText(it.body)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
                     .build()
 
                 notificationManager.notify(noteId, notification)
-                Log.d("ReminderReceiver", "Notification sent for note: ${it.text}")
-            } ?: Log.e("ReminderReceiver", "Note with id $noteId not found")
-        } else {
-            Log.e("ReminderReceiver", "Invalid noteId: $noteId")
+            }
         }
     }
 }

@@ -2,6 +2,17 @@
   <dictionary name="project">
     <words>
       <w>notifyer</w>
+      <w>введите</w>
+      <w>добавить</w>
+      <w>добавлена</w>
+      <w>заметка</w>
+      <w>заметку</w>
+      <w>отмена</w>
+      <w>папки</w>
+      <w>папку</w>
+      <w>редактировать</w>
+      <w>сохранить</w>
+      <w>удалить</w>
     </words>
   </dictionary>
 </component>
