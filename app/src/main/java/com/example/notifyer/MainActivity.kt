@@ -4,6 +4,8 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
@@ -170,13 +172,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         scope.launch {
             folders = withContext(Dispatchers.IO) {
                 val list = dbHelper.getAllFolders()
-                if (list.isEmpty()) {
+                list.ifEmpty {
                     dbHelper.addFolder(getString(R.string.all_notes))
                     dbHelper.addFolder(getString(R.string.personal))
                     dbHelper.addFolder(getString(R.string.work))
                     dbHelper.getAllFolders()
-                } else {
-                    list
                 }
             }
             updateNavigationMenu()
@@ -191,17 +191,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         menu.clear()
 
         menu.add(0, FOLDER_ALL_NOTES, Menu.NONE, getString(R.string.all_notes))
-            .setIcon(R.drawable.ic_folder)
-            .setCheckable(true)
+            .setIcon(R.drawable.ic_folder).isCheckable = true
 
         folders.filter { it.id != FOLDER_ALL_NOTES }.forEach { folder ->
             menu.add(0, folder.id, Menu.NONE, folder.name)
-                .setIcon(R.drawable.ic_folder)
-                .setCheckable(true)
+                .setIcon(R.drawable.ic_folder).isCheckable = true
         }
 
         menu.add(0, NAV_ADD_FOLDER_ID, Menu.NONE, getString(R.string.add_folder))
             .setIcon(android.R.drawable.ic_menu_add)
+
+        
     }
 
     private fun loadNotes() {
@@ -266,7 +266,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         AlertDialog.Builder(this)
             .setTitle(R.string.add_folder)
             .setView(input)
-            .setPositiveButton("Добавить") { _, _ ->
+            .setPositiveButton(getString(R.string.add_button)) { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isNotEmpty()) {
                     scope.launch {

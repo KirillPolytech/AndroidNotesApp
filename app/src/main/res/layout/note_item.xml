@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="?android:attr/selectableItemBackground">
+    android:background="@color/MainElBG">
 
     <!-- Только текст заметки -->
     <TextView
@@ -13,7 +13,10 @@
         android:layout_height="wrap_content"
         android:textSize="16sp"
         android:maxLines="3"
-        android:ellipsize="end" />
+        android:ellipsize="end"
+        android:textColor="@color/MainElText"
+        android:text="Test"
+        />
 
     <!-- Папка, дата, напоминание -->
     <TextView
@@ -21,22 +24,28 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textColor="@android:color/darker_gray"
-        android:textSize="12sp" />
+        android:textColor="@color/MainElText"
+        android:textSize="12sp"
+        android:text="Test"
+        />
 
     <TextView
         android:id="@+id/createdAtText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:textColor="@android:color/darker_gray" />
+        android:textColor="@color/MainElText"
+        android:text="Test"
+        />
 
     <TextView
         android:id="@+id/reminderTimeText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:textColor="@android:color/darker_gray" />
+        android:textColor="@color/MainElText"
+        android:text="Test"
+        />
 
     <!-- Кнопки -->
     <LinearLayout
@@ -51,14 +60,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Pin"
-            style="?android:attr/buttonBarButtonStyle" />
+            style="?android:attr/buttonBarButtonStyle"
+            android:textColor="@color/MainElText"/>
 
         <Button
             android:id="@+id/deleteButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/delete_button"
-            style="?android:attr/buttonBarButtonStyle" />
+            style="?android:attr/buttonBarButtonStyle"
+            android:textColor="@color/MainElText"/>
 
     </LinearLayout>
 
