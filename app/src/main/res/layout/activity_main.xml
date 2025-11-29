@@ -38,11 +38,9 @@
 
             <TextView
                 android:id="@+id/titleTextView"
-                android:paddingLeft="16dp"
                 android:paddingStart="16dp"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
                 android:layout_weight="1"
                 android:text="@string/all_notes"
                 android:textSize="20sp"
@@ -54,16 +52,6 @@
                 android:textColor="@color/MainElText"
                 tools:ignore="RtlSymmetry" />
 
-            <TextView
-                android:id="@+id/noteCountTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:layout_marginRight="8dp"
-                android:text="0"
-                android:textColor="@color/MainElText"
-                android:textSize="16sp" />
-
         </LinearLayout>
 
         <!-- === ПОИСК === -->
@@ -71,13 +59,15 @@
             android:id="@+id/searchInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Поиск заметок…"
+            android:autofillHints="Поиск заметок"
+            android:hint="Поиск заметок..."
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:padding="12dp"
             android:layout_marginBottom="8dp"
             android:background="@color/MainElBG"
             android:textColorHint="@color/MainElText"
+            android:textColor="@color/MainElText"
             />
 
         <!-- === ПОЛЕ ВВОДА + КНОПКА === -->
@@ -101,7 +91,9 @@
                 android:padding="12dp"
                 android:background="@color/MainElBG"
                 android:layout_marginEnd="8dp"
-                android:textColorHint="@color/MainElText"  />
+                android:textColorHint="@color/MainElText"
+                android:textColor="@color/MainElText"
+                />
 
             <Button
                 android:id="@+id/addButton"
@@ -113,6 +105,16 @@
         </LinearLayout>
 
         <!-- === СПИСОК ЗАМЕТОК === -->
+        <TextView
+            android:id="@+id/noteCountTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="0"
+            android:textColor="@color/MainElText"
+            android:textSize="16sp"
+            android:layout_gravity="end|center_vertical"/>
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerView"
             android:layout_width="match_parent"

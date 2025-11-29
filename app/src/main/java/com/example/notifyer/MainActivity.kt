@@ -24,6 +24,7 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.notifyer.R.color.MainElText
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.*
 import java.util.*
@@ -201,7 +202,20 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         menu.add(0, NAV_ADD_FOLDER_ID, Menu.NONE, getString(R.string.add_folder))
             .setIcon(android.R.drawable.ic_menu_add)
 
-        
+        // Set folders and texts color.
+        val whiteC = ContextCompat.getColor(this, MainElText)
+        val states = arrayOf(
+            intArrayOf(android.R.attr.state_checked),
+            intArrayOf(-android.R.attr.state_checked)
+        )
+        val textColors = intArrayOf(
+            ContextCompat.getColor(this, MainElText),
+            whiteC
+        )
+
+        navView.itemTextColor = ColorStateList(states, textColors)
+        navView.itemIconTintList = ColorStateList(states, textColors)
+        //
     }
 
     private fun loadNotes() {

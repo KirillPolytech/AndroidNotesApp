@@ -10,6 +10,6 @@
 
     <color name="MainElBG">#2C2C2C</color>
     <color name="MainElText">#FFFFFFFF</color>
-    <color name="CanvasBG">#151515</color>
+    <color name="CanvasBG">#151515</color> <!-- #151515 -->
 
 </resources>

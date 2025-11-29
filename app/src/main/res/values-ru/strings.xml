@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Notifyer</string>
+    <string name="app_name">Нотифаер</string>
     <string name="note_input_hint">Введите заметку…</string>
     <string name="add_button">Добавить</string>
     <string name="add_folder">Добавить папку</string>
