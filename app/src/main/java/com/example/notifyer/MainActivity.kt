@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
@@ -13,6 +12,7 @@ import android.text.TextWatcher
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.activity.OnBackPressedCallback
@@ -24,7 +24,6 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.notifyer.R.color.MainElText
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.*
 import java.util.*
@@ -54,6 +53,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         private const val REQUEST_CODE_NOTIFICATIONS = 100
         private const val FOLDER_ALL_NOTES = 1
         private const val NAV_ADD_FOLDER_ID = 999
+        private const val PREFS_NAME = "NotifyerPrefs"
+        private const val PREF_TRANSLATED = "foldersTranslated"
     }
 
     // === ПРИНУДИТЕЛЬНЫЙ РУССКИЙ ЯЗЫК ===
@@ -66,7 +67,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             config.setLocale(locale)
             super.attachBaseContext(base.createConfigurationContext(config))
         } else {
+            @Suppress("DEPRECATION")
             config.locale = locale
+            @Suppress("DEPRECATION")
             base.resources.updateConfiguration(config, base.resources.displayMetrics)
             super.attachBaseContext(base)
         }
@@ -81,8 +84,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setupClickListeners()
         setupNavigation()
         setupBackPress()
-        loadFoldersAndNotes()
+        loadFoldersAndNotes(true)
         requestPermissions()
+        translateDefaultFoldersIfNeeded()
     }
 
     // === ИНИЦИАЛИЗАЦИЯ ВСЕХ VIEW ===
@@ -137,7 +141,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                     addNoteWithReminder(text, reminderTime)
                 }
             } else {
-                Toast.makeText(this, "Введите текст и выберите папку", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.enter_text_and_select_folder), Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -162,26 +166,37 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
                     drawerLayout.closeDrawer(GravityCompat.START)
                 } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                    finish()
                 }
             }
         })
     }
 
-    private fun loadFoldersAndNotes() {
+    private fun translateDefaultFoldersIfNeeded() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(PREF_TRANSLATED, false)) {
+            dbHelper.translateDefaultFolders()
+            prefs.edit().putBoolean(PREF_TRANSLATED, true).apply()
+        }
+    }
+
+    private fun loadFoldersAndNotes(initialLoad: Boolean = false) {
         scope.launch {
             folders = withContext(Dispatchers.IO) {
                 val list = dbHelper.getAllFolders()
-                list.ifEmpty {
-                    dbHelper.addFolder(getString(R.string.all_notes))
+                if (list.isEmpty()) {
+                    dbHelper.addFolder(getString(R.string.all_notes)) // ID will be 1
                     dbHelper.addFolder(getString(R.string.personal))
                     dbHelper.addFolder(getString(R.string.work))
                     dbHelper.getAllFolders()
+                } else {
+                    list
                 }
             }
             updateNavigationMenu()
-            currentFolderId = FOLDER_ALL_NOTES
+            if (initialLoad) {
+                currentFolderId = FOLDER_ALL_NOTES
+            }
             updateTitle()
             loadNotes()
         }
@@ -191,31 +206,39 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         val menu: Menu = navView.menu
         menu.clear()
 
-        menu.add(0, FOLDER_ALL_NOTES, Menu.NONE, getString(R.string.all_notes))
-            .setIcon(R.drawable.ic_folder).isCheckable = true
+        folders.forEach { folder ->
+            val menuItem = menu.add(0, folder.id, Menu.NONE, folder.name).apply {
+                setIcon(R.drawable.ic_folder)
+                isCheckable = true
+            }
 
-        folders.filter { it.id != FOLDER_ALL_NOTES }.forEach { folder ->
-            menu.add(0, folder.id, Menu.NONE, folder.name)
-                .setIcon(R.drawable.ic_folder).isCheckable = true
+            if (folder.id != FOLDER_ALL_NOTES) {
+                val deleteButton = ImageButton(this, null, 0, androidx.appcompat.R.style.Widget_AppCompat_ActionButton).apply {
+                    setImageResource(android.R.drawable.ic_menu_delete)
+                    setOnClickListener { showDeleteFolderDialog(folder) }
+                }
+                menuItem.actionView = deleteButton
+            }
         }
 
         menu.add(0, NAV_ADD_FOLDER_ID, Menu.NONE, getString(R.string.add_folder))
             .setIcon(android.R.drawable.ic_menu_add)
 
-        // Set folders and texts color.
-        val whiteC = ContextCompat.getColor(this, MainElText)
-        val states = arrayOf(
-            intArrayOf(android.R.attr.state_checked),
-            intArrayOf(-android.R.attr.state_checked)
-        )
-        val textColors = intArrayOf(
-            ContextCompat.getColor(this, MainElText),
-            whiteC
+        val unselectedColor = ContextCompat.getColor(this, com.example.notifyer.R.color.MainElText)
+        val selectedColor = ContextCompat.getColor(this, com.example.notifyer.R.color.purple_700)
+
+        val colorStateList = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_checked),
+                intArrayOf()
+            ),
+            intArrayOf(selectedColor, unselectedColor)
         )
 
-        navView.itemTextColor = ColorStateList(states, textColors)
-        navView.itemIconTintList = ColorStateList(states, textColors)
-        //
+        navView.itemTextColor = colorStateList
+        navView.itemIconTintList = colorStateList
+
+        menu.findItem(currentFolderId)?.isChecked = true
     }
 
     private fun loadNotes() {
@@ -245,11 +268,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     private fun updateTitle() {
-        val folderName = if (currentFolderId == FOLDER_ALL_NOTES) {
-            getString(R.string.all_notes)
-        } else {
-            folders.find { it.id == currentFolderId }?.name ?: getString(R.string.all_notes)
-        }
+        val folderName = folders.find { it.id == currentFolderId }?.name ?: getString(R.string.all_notes)
         titleTextView.text = folderName
     }
 
@@ -258,21 +277,21 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            NAV_ADD_FOLDER_ID -> {
-                showAddFolderDialog()
-                return true
-            }
-            else -> {
-                currentFolderId = item.itemId
-                item.isChecked = true
-                updateTitle()
-                searchInput.text.clear()
-                loadNotes()
-                drawerLayout.closeDrawer(GravityCompat.START)
-                return true
-            }
+        val id = item.itemId
+        if (id == NAV_ADD_FOLDER_ID) {
+            showAddFolderDialog()
+            return true
         }
+
+        if (id != currentFolderId) {
+            currentFolderId = id
+            updateNavigationMenu() // Redraw to update selection
+            updateTitle()
+            searchInput.text.clear()
+            loadNotes()
+        }
+        drawerLayout.closeDrawer(GravityCompat.START)
+        return true
     }
 
     private fun showAddFolderDialog() {
@@ -285,11 +304,29 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 if (name.isNotEmpty()) {
                     scope.launch {
                         withContext(Dispatchers.IO) { dbHelper.addFolder(name) }
-                        loadFoldersAndNotes()
+                        loadFoldersAndNotes() // Reload folders, keep current selection
                     }
                 }
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showDeleteFolderDialog(folder: Folder) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete_folder)
+            .setMessage(getString(R.string.delete_folder_confirmation, folder.name))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { dbHelper.deleteFolder(folder.id) }
+                    // If the deleted folder was the current one, switch to "All Notes"
+                    if (currentFolderId == folder.id) {
+                        currentFolderId = FOLDER_ALL_NOTES
+                    }
+                    loadFoldersAndNotes()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
@@ -314,7 +351,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 }
                 loadNotes()
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.error_prefix) + e.message, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -338,9 +375,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun showEditDialog(note: Note) {
         val editText = EditText(this).apply { setText(note.body) }
         AlertDialog.Builder(this)
-            .setTitle("Редактировать заметку")
+            .setTitle(R.string.edit_note_title)
             .setView(editText)
-            .setPositiveButton("Сохранить") { _, _ ->
+            .setPositiveButton(R.string.save_button) { _, _ ->
                 val newText = editText.text.toString().trim()
                 if (newText.isNotEmpty()) {
                     scope.launch {
@@ -358,29 +395,29 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                     }
                 }
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     private fun showDeleteDialog(note: Note) {
         AlertDialog.Builder(this)
-            .setTitle("Удалить заметку")
-            .setMessage("Вы уверены?")
-            .setPositiveButton("Удалить") { _, _ ->
+            .setTitle(R.string.delete_note_title)
+            .setMessage(R.string.delete_note_message)
+            .setPositiveButton(R.string.delete) { _, _ ->
                 scope.launch {
                     withContext(Dispatchers.IO) { dbHelper.deleteNote(note.id) }
                     loadNotes()
                 }
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     private fun showReminderDialog(onSet: (Long?) -> Unit) {
         AlertDialog.Builder(this)
-            .setTitle("Установить напоминание")
-            .setMessage("Добавить напоминание?")
-            .setPositiveButton("Да") { _, _ ->
+            .setTitle(getString(R.string.set_reminder))
+            .setMessage(getString(R.string.add_reminder_question))
+            .setPositiveButton(getString(R.string.yes)) { _, _ ->
                 val cal = Calendar.getInstance()
                 DatePickerDialog(
                     this,
@@ -395,7 +432,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                                 if (time > System.currentTimeMillis()) {
                                     onSet(time)
                                 } else {
-                                    Toast.makeText(this, "Выберите время в будущем", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this, getString(R.string.select_future_time), Toast.LENGTH_SHORT).show()
                                     onSet(null)
                                 }
                             },
@@ -409,7 +446,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                     cal.get(Calendar.DAY_OF_MONTH)
                 ).show()
             }
-            .setNegativeButton("Нет") { _, _ -> onSet(null) }
+            .setNegativeButton(getString(R.string.no)) { _, _ -> onSet(null) }
             .show()
     }
 
@@ -418,7 +455,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             ContextCompat.checkSelfPermission(this, android.Manifest.permission.SCHEDULE_EXACT_ALARM) != PackageManager.PERMISSION_GRANTED
         ) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@MainActivity, "Нет разрешения на точные будильники", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.no_permission_for_exact_alarms), Toast.LENGTH_LONG).show()
             }
             return
         }
@@ -441,7 +478,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         val channelId = "note_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(channelId, "Заметки", NotificationManager.IMPORTANCE_DEFAULT)
+                NotificationChannel(channelId, getString(R.string.notes_channel_name), NotificationManager.IMPORTANCE_DEFAULT)
             )
         }
         val notification = NotificationCompat.Builder(this, channelId)
@@ -479,7 +516,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         if (requestCode == REQUEST_CODE_NOTIFICATIONS && grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             // OK
         } else {
-            Toast.makeText(this, "Некоторые разрешения отклонены", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.some_permissions_denied), Toast.LENGTH_LONG).show()
         }
     }
 }

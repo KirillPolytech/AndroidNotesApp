@@ -21,7 +21,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val channel = NotificationChannel(
                         channelId,
-                        "Note Reminders",
+                        context.getString(R.string.reminder_channel_name),
                         NotificationManager.IMPORTANCE_HIGH
                     )
                     notificationManager.createNotificationChannel(channel)
@@ -29,7 +29,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val notification = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("Reminder")
+                    .setContentTitle(context.getString(R.string.reminder_notification_title))
                     .setContentText(it.body)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setAutoCancel(true)

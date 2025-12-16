@@ -8,9 +8,11 @@ import android.util.Log
 
 class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
+    private val context: Context = context
+
     companion object {
         private const val DATABASE_NAME = "notes.db"
-        private const val DATABASE_VERSION = 7
+        private const val DATABASE_VERSION = 8
         private const val TABLE_NOTES = "notes"
         private const val TABLE_FOLDERS = "folders"
         private const val COLUMN_ID = "id"
@@ -32,6 +34,7 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
                 $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $COLUMN_NAME TEXT NOT NULL,
                 $COLUMN_PARENT_ID INTEGER,
+                $COLUMN_CREATED_AT INTEGER NOT NULL,
                 FOREIGN KEY ($COLUMN_PARENT_ID) REFERENCES $TABLE_FOLDERS($COLUMN_ID)
             )
         """.trimIndent()
@@ -51,19 +54,12 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             )
         """.trimIndent()
         db.execSQL(createNotesTable)
-
-        // Начальные папки
-        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('All Notes')")
-        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('Personal')")
-        db.execSQL("INSERT INTO $TABLE_FOLDERS ($COLUMN_NAME) VALUES ('Work')")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         Log.d("NoteDatabaseHelper", "Upgrading from $oldVersion to $newVersion")
-        if (oldVersion < 7) {
-            db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
-            db.execSQL("DROP TABLE IF EXISTS $TABLE_FOLDERS")
-            onCreate(db)
+        if (oldVersion < 8) {
+            db.execSQL("ALTER TABLE $TABLE_FOLDERS ADD COLUMN $COLUMN_CREATED_AT INTEGER NOT NULL DEFAULT 0")
         }
     }
 
@@ -72,10 +68,27 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         val values = ContentValues().apply {
             put(COLUMN_NAME, name)
             parentId?.let { put(COLUMN_PARENT_ID, it) }
+            put(COLUMN_CREATED_AT, System.currentTimeMillis())
         }
         val id = db.insert(TABLE_FOLDERS, null, values)
         db.close()
         return id
+    }
+
+    fun translateDefaultFolders() {
+        val db = writableDatabase
+        val values = ContentValues()
+        values.put(COLUMN_NAME, context.getString(R.string.all_notes))
+        db.update(TABLE_FOLDERS, values, "$COLUMN_NAME = ?", arrayOf("All Notes"))
+
+        values.clear()
+        values.put(COLUMN_NAME, context.getString(R.string.personal))
+        db.update(TABLE_FOLDERS, values, "$COLUMN_NAME = ?", arrayOf("Personal"))
+
+        values.clear()
+        values.put(COLUMN_NAME, context.getString(R.string.work))
+        db.update(TABLE_FOLDERS, values, "$COLUMN_NAME = ?", arrayOf("Work"))
+        db.close()
     }
 
     fun addNote(title: String?, body: String, folderId: Int, reminderTime: Long? = null, isPinned: Boolean = false): Long {
@@ -128,6 +141,13 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         db.close()
     }
 
+    fun deleteFolder(folderId: Int) {
+        val db = writableDatabase
+        db.delete(TABLE_NOTES, "$COLUMN_FOLDER_ID = ?", arrayOf(folderId.toString()))
+        db.delete(TABLE_FOLDERS, "$COLUMN_ID = ?", arrayOf(folderId.toString()))
+        db.close()
+    }
+
     fun getAllNotes(folderId: Int? = null): List<Note> {
 
         val notes = mutableListOf<Note>()
@@ -164,11 +184,12 @@ class NoteDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         val db = readableDatabase
         val selection = parentId?.let { "$COLUMN_PARENT_ID = ?" }
         val selectionArgs = parentId?.let { arrayOf(it.toString()) }
-        val cursor = db.query(TABLE_FOLDERS, null, selection, selectionArgs, null, null, "$COLUMN_NAME ASC")
+        val cursor = db.query(TABLE_FOLDERS, null, selection, selectionArgs, null, null, "CASE WHEN $COLUMN_ID = 1 THEN 0 ELSE 1 END, $COLUMN_CREATED_AT DESC")
         while (cursor.moveToNext()) {
             val folder = Folder(
                 id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_ID)),
-                name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME)) ?: ""
+                name = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_NAME)) ?: "",
+                createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_CREATED_AT))
             )
             folders.add(folder)
         }

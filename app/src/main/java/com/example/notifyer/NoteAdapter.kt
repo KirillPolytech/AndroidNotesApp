@@ -49,11 +49,11 @@ class NoteAdapter(
         }
 
         // Кнопка Pin
-        holder.pinButton.text = if (note.isPinned) "Unpin" else "Pin"
+        holder.pinButton.text = if (note.isPinned) holder.itemView.context.getString(R.string.unpin) else holder.itemView.context.getString(R.string.pin)
         holder.pinButton.setOnClickListener {
             val newPinned = !note.isPinned
             onPinToggle(note, newPinned)
-            holder.pinButton.text = if (newPinned) "Unpin" else "Pin"
+            holder.pinButton.text = if (newPinned) holder.itemView.context.getString(R.string.unpin) else holder.itemView.context.getString(R.string.pin)
         }
 
         holder.itemView.setOnClickListener { onEditClick(note) }
